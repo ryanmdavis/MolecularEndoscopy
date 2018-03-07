@@ -24,8 +24,8 @@ end
 
 colormap_ratios=zeros(2,64,3);
 colormap_ratios(1,:,:)=colormap_red;
-colormap_ratios(2,:,:)=colormap_green;
-colormap_ratios(3,:,:)=colormap_orange;
-colormap_ratios(4,:,:)=colormap_blue;
+colormap_ratios(2,:,:)=colormap_blue;
+colormap_ratios(3,:,:)=colormap_green;
+colormap_ratios(4,:,:)=colormap_orange;
 
-save('C:\Users\rdavis5\Dropbox\process and visualize Raman - sharable\colormap\my colormaps.mat','colormap_ratios','-append');
+save('C:\Users\rdavis5\Dropbox\MolecularEndoscopy\colormap\my colormaps.mat','colormap_ratios','-append');

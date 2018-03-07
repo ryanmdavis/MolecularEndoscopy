@@ -1,34 +1,68 @@
-% each dataset must be in it's own folder
+% test datasets: 
+% E:\Renishaw\01222018 - bladder\50x bladder tumor high res 3
 
-function save_file_path = processRaman(dir_in,varargin)
+function prdata = processRaman(dir_in,varargin)
 
 % assign optional arguments
 % use 'shift_std_spectra_wavenumber',-10 for Renishaw
 % if 'input_recon_param_location' == 1 then we are specifying the location
 % of the *reconstruction parameters.mat file
-invar = struct('use_dB',0,'redo',0,'shift_std_spectra_wavenumber',0,'show_images',0,'num_background_pc',3,'input_rp_file_location',0);
+% data_input_mode:
+%   0: put file location to read raw data from
+%   1: put file location to read processed data from (i.e. *.pr.mat) ***
+%   unnessecary
+%   2: pass data from memory in the optional variable called "input_data"
+
+invar = struct('use_dB',0,'redo',0,'shift_std_spectra_wavenumber',0,'show_images',0,'num_background_pc',3,'data_input_mode',0,'input_data',[]);
 argin = varargin;
 invar = generateArgin(invar,argin);
 
-if invar.input_rp_file_location
-    warning('off','MATLAB:load:variableNotFound');
-    load(dir_in,'out','prdata');
-    warning('on','MATLAB:load:variableNotFound');
-    if ~exist('out','var')
-        out=prdata;
+%% Load raw Raman spectra
+if (invar.data_input_mode == 1)
+    error('invalid');
+%     warning('off','MATLAB:load:variableNotFound');
+%     load(dir_in,'out','prdata');
+%     warning('on','MATLAB:load:variableNotFound');
+%     if ~exist('out','var')
+%         out=prdata;
+%     end
+%     parent_dir=out.rp.parent_dir;
+%     rp=out.rp;
+%     im1=out.im1;
+%     im2=out.im2;  %% right now we are holding two image datasets in memory, this needs to be fixed.
+
+% raw Raman spectra provided as function input
+elseif (invar.data_input_mode == 2)
+    if isempty(invar.input_data)
+        error('When setting invar.data_input_mode=2, you must pass the Raman image data into the optional variable "input_data"');
     end
-    parent_dir=out.rp.parent_dir;
-    rp=out.rp;
-    im1=out.im1;
-    im2=out.im2;
+    rp=invar.input_data.rp;
+    parent_dir=rp.parent_dir;
+    im1=invar.input_data.im1;
+    im2=invar.input_data.im2_raw;
+    im2_fit=invar.input_data.im2_fit;
+    invar.input_data=[]; %free memory
+    
+% raw Raman spectra read from hard drive
 else
     parent_dir=dir_in;
     % make sure parent dir has slash at end
     if ~strcmp(parent_dir(end),mkslash) parent_dir = strcat(parent_dir,mkslash); end
     rp=struct('im1_path','','im2_path','','reg_param',[],'im1',[],'im2',[],'im2_nrow',[],'im2_ncol',[],'fused',[],'tissue_map',[],'A',[],'wavenumber',[],'channel_names',[],'parent_dir',parent_dir,'shift_std_spectra_wavenumber',invar.shift_std_spectra_wavenumber,'A_info',[],'concentrations',[],'use_dB',invar.use_dB);
+
+    %get location of raw Raman data
+    [filename,pathname] = uigetfile({'*.txt','Endoscope data';'*.*','All Files';
+            '*.spc','Microscope data';},'Locate the .txt file with Raman Data',parent_dir);
+    % make sure parent dir has slash at end
+    if ~strcmp(pathname(end),mkslash) pathname = strcat(pathname,mkslash); end
+    rp.im2_path=pathname;
+    rp.im2_filename=filename;
+    
+    % read raw data from hard drive
+    [im2,rp]=loadRawRamanFromHD(rp);
 end
 
-%% check if paths are valid - this code kicks in if the location of the file has been changed
+% check if paths are valid - this code kicks in if the location of the files have been changed
 if ~exist(rp.im2_path,'dir') && ~isempty(rp.im2_path)
     dot_loc=strfind(prdata.file_name,'.');
     txt_file_name=strcat(prdata.file_name(1:dot_loc(1)),'txt');
@@ -49,26 +83,26 @@ end
 %     rp = loadRp(parent_dir);
 % end
 
-% load Raman data
-if isempty(rp.im2_path) || invar.redo==3 || invar.redo==-1
-    [filename,pathname] = uigetfile({'*.txt','Endoscope data';'*.*','All Files';
-            '*.spc','Microscope data';},'Locate the .txt file with Raman Data',parent_dir);
-    % make sure parent dir has slash at end
-    if ~strcmp(pathname(end),mkslash) pathname = strcat(pathname,mkslash); end
-    rp.im2_path=pathname;
-    rp.im2_filename=filename;
-    dot_loc=strfind(rp.im2_filename,'.');
-    filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
-    
-    % save recon parameters
-    saveRp(filename_save,rp);
-else
-    % define path to save the processed Raman data (.pr.mat)
-    dot_loc=strfind(rp.im2_filename,'.');
-    filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
-end
+% find location of Raman image and store in memory:
+% if isempty(rp.im2_path) || invar.redo==3 || invar.redo==-1
+%     [filename,pathname] = uigetfile({'*.txt','Endoscope data';'*.*','All Files';
+%             '*.spc','Microscope data';},'Locate the .txt file with Raman Data',parent_dir);
+%     % make sure parent dir has slash at end
+%     if ~strcmp(pathname(end),mkslash) pathname = strcat(pathname,mkslash); end
+%     rp.im2_path=pathname;
+%     rp.im2_filename=filename;
+%     dot_loc=strfind(rp.im2_filename,'.');
+%     filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
+%     
+%     % save recon parameters
+%     saveRp(filename_save,rp);
+% else
+%     % define path to save the processed Raman data (.pr.mat)
+%     dot_loc=strfind(rp.im2_filename,'.');
+%     filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
+% end
 
-% load first image
+%% load photograph if desired
 if isempty(rp.im1_path) || invar.redo==1 || invar.redo==-1 || (invar.redo == 6 && strcmp(rp.im1_path,'none'))
     [filename,pathname] = uigetfile({'*.jpg;*.tif;*.png;*.gif','All Image Files';...
           '*.*','All Files' },'Locate a photograph for registration, or press cancel',...
@@ -81,13 +115,16 @@ if isempty(rp.im1_path) || invar.redo==1 || invar.redo==-1 || (invar.redo == 6 &
         rp.im1_path='none';
         im1=[];
     end
-    saveRp(filename_save,rp);
-elseif strcmp(rp.im1_path,'none')
-    im1=[];
+%     saveRp(filename_save,rp);
+
+% removed this because it was making im1 empty when it already had a value
+% from line 41 above
+% elseif strcmp(rp.im1_path,'none')
+%     im1=[];
 end
 
 
-% draw user specified mask that surrounds tissue
+%% draw user specified mask that surrounds tissue if performing registration
 if ~strcmp(rp.im1_path,'none') && (isempty(rp.tissue_map) || invar.redo==2 || invar.redo==-1)
     f_p=figure;
     imagesc(im1);
@@ -99,48 +136,24 @@ if ~strcmp(rp.im1_path,'none') && (isempty(rp.tissue_map) || invar.redo==2 || in
     close(f_p);
 end
 
-% recon second image based on if this the data were separated into rows
-if isempty(strfind(rp.im2_filename,'_to_')) && ~isempty(strfind(rp.im2_filename,'.spc'))
-    spectra=readRenishawSpc(strcat(rp.im2_path,rp.im2_filename));
-    rows_cols=[];
-    system='Renishaw';
-elseif ~isempty(strfind(rp.im2_filename,'.spc'))
-    [spectra,rows_cols]=concatenateRamanSpectraRows(rp.im2_path);
-    rp.im2_nrow=rows_cols(1);
-    rp.im2_ncol=rows_cols(2);
-    system='Renishaw';
-elseif ~isempty(strfind(rp.im2_filename,'.txt'))
-    spectra = readRamanEndoscopeTxt(strcat(rp.im2_path,rp.im2_filename));
-    rows_cols=[];
-    system='Endoscope';
+% if first image (i.e. photograph) is not loaded, set tissue mask as
+% "everything"
+if isempty(im1)
+   rp.tissue_map=ones(size(im2.spectra,1),size(im2.spectra,2));
+   im1=zeros(rp.im2_nrow,rp.im2_ncol,3);
 end
 
-% get info about image matrix size
-if isempty(rows_cols) && (isempty(rp.im2_nrow) || invar.redo==4 || invar.redo==-1)
-    display(strcat('Total spectra: ',num2str(size(spectra.spectra,1))));
-    rp.im2_nrow=input('Enter the number of rows in the Raman map: ');
-    saveRp(filename_save,rp);
-end
 
-if isempty(rows_cols) && (isempty(rp.im2_ncol) || invar.redo==4 || invar.redo==-1)
-    rp.im2_ncol=input('Enter the number of cols in the Raman map: ');
-    saveRp(filename_save,rp);
-end
 
 % reshape and arrange data for unmixing, unless raw data was split up into
 % rows 
-if isempty(rows_cols)
-    b=permute(reshape(spectra.spectra,rp.im2_ncol,rp.im2_nrow,size(spectra.spectra,2)),[2,1,3]);
-else
-    b=spectra.spectra;
-end
+% if isempty(rows_cols)
+%     b=permute(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,size(spectra.spectra,2)),[2,1,3]);
+% % else
+% %     b=spectra.spectra;
+% end
 
-% if first image (i.e. photograph) is not loaded, set tissue mask as
-% "everything"
-if strcmp(rp.im1_path,'none')
-   rp.tissue_map=ones(rp.im2_nrow,rp.im2_ncol);
-   im1=zeros(rp.im2_nrow,rp.im2_ncol,3);
-end
+
 
 %% define forward problem A (b=Ax) and solve for x
 if isempty(rp.A) || invar.redo==7 || invar.redo==-1
@@ -172,7 +185,7 @@ if isempty(rp.A) || invar.redo==7 || invar.redo==-1
     rp.channel_names=channel_names;
     rp.num_np_channels=num_np_channels;
     rp.A_info=A_info;
-    saveRp(filename_save,rp);
+%     saveRp(filename_save,rp);
 end
 
 % kludge fix: forthis dataset, one of the rows was shifted!?
@@ -181,33 +194,32 @@ if strcmp(parent_dir,'C:\Users\rdavis5\Documents\Gambhir lab\Gambhir Data and An
 end
 
 
-% if we are specifying different concentrations for each channel
+%% if we are specifying different concentrations of nanoparticle mixture for each channel
 if invar.redo==5 % if we are specifying different concentrations for each channel
     [rp.concentrations,rp.control_channel]=queryRelativeConcGUI(rp.channel_names(1:rp.num_np_channels),rp.concentrations,rp.control_channel);
-    out_unmix=im2;
 elseif invar.redo==-1 || invar.redo==0 || isempty(rp.concentrations)
     rp.concentrations=ones(1,rp.num_np_channels);
     rp.control_channel=1;
     % perform unmixing
-    out_unmix=pivUnmixing(b,rp.A,pinv(rp.A),spectra.wavenumber,rp.wavenumber);
+    im2_fit=pivUnmixing(im2.spectra,rp.A,pinv(rp.A),im2.wavenumber,rp.wavenumber);
 else
     % perform unmixing
-    out_unmix=pivUnmixing(b,rp.A,pinv(rp.A),spectra.wavenumber,rp.wavenumber);
+    im2_fit=pivUnmixing(im2.spectra,rp.A,pinv(rp.A),im2.wavenumber,rp.wavenumber);
 end
 
 %% perform registration
 % find out the scale,shift, and rotation needed to match the two images
 if (~strcmp(rp.im1_path,'none') && isempty(rp.reg_param)) || invar.redo==6 || invar.redo==-1
-    rp.reg_param = determineAffineTransform2(im1,squeeze(out_unmix.x(2,:,:)));
-    saveRp(filename_save,rp);
+    rp.reg_param = determineAffineTransform2(im1,squeeze(im2_fit.x(2,:,:)));
+%     saveRp(filename_save,rp);
 elseif isempty(rp.reg_param)
     % make im1 a RGB image of zeros of same size as im2
-    im1 = zeros([size(squeeze(out_unmix.x(1,:,:))) 3]);
-    rp.reg_param=struct('shift_rc',[0 0],'rotation',0,'scale',1,'backwards_rot',@(x,y) round([y x]),'center_im1',round([size(im1,1) size(im1,2)]),'padded_im_size_rc',[size(im1,1) size(im1,2)],'padded_im_center_xy',round([size(im1,2) size(im1,1)]/2),'im2_pad_size_rc',[size(im1,1) size(im1,2)],'pad_size_rc',[0 0]);
-    saveRp(filename_save,rp);
+    im1 = zeros([size(im2.spectra,1) size(im2.spectra,2) 3]);
+    rp.reg_param=struct('shift_rc',[0 0],'rotation',0,'scale',1,'backwards_rot',@(x,y) round([y x]),'center_im1',round([size(im1,1) size(im1,2)]/2),'padded_im_size_rc',[size(im2.spectra,1) size(im2.spectra,2)],'padded_im_center_xy',round([size(im2.spectra,2) size(im2.spectra,1)]/2),'im2_pad_size_rc',[size(im2.spectra,1) size(im2.spectra,2)],'pad_size_rc',[0 0]);
+%     saveRp(filename_save,rp);
 end
 
-% for each channel, do the registration and overlay
+% load colormaps for registration overlay
 mf=mfilename('fullpath');
 slash_loc=strfind(mf,mkslash);
 colormap_path=strcat(mf(1:slash_loc(end)),'colormap',mkslash,'my colormaps.mat');
@@ -215,31 +227,29 @@ load(colormap_path,'colormap_bg','colormap_ratios');  %load the colormap
 colormap_use=parula;
 colormap_use(1,:)=0;
 
-% out(1:size(out_unmix.x,1))=struct('fused',[],'im1_reg',[],'im2_reg',[],'im1',im1,'im2',out_unmix,'scale',[],'colormap',colormap_bg,'reg_param',rp.reg_param,'A',A,'x',out_unmix.x);
-im_reg_blank=zeros([size(out_unmix.x,1) (rp.reg_param.padded_im_size_rc-2*rp.reg_param.pad_size_rc) 3]);
-im_reg_blank_grayscale=zeros([size(out_unmix.x,1) (rp.reg_param.padded_im_size_rc-2*rp.reg_param.pad_size_rc)]);
+% out(1:size(im2_fit.x,1))=struct('fused',[],'im1_reg',[],'im2_reg',[],'im1',im1,'im2',im2_fit,'scale',[],'colormap',colormap_bg,'reg_param',rp.reg_param,'A',A,'x',im2_fit.x);
+im_reg_blank=zeros([size(im2_fit.x,1) (rp.reg_param.padded_im_size_rc-2*rp.reg_param.pad_size_rc) 3]);
+im_reg_blank_grayscale=zeros([size(im2_fit.x,1) (rp.reg_param.padded_im_size_rc-2*rp.reg_param.pad_size_rc)]);
 
 % define structure
-% changed colormap entry to parula from colormap_bg
-out=struct('fused',im_reg_blank,'im1_reg_rgb',im_reg_blank,'im2_reg_rgb',im_reg_blank,'im2_reg_grayscale',im_reg_blank_grayscale,'im1',im1,'im2',out_unmix,'scale',zeros(size(out_unmix.x,1),2),'colormap',colormap_use,'ratio_colormaps',colormap_ratios,'reg_param',rp.reg_param,'A',rp.A,'x',out_unmix.x,'channel_names',{rp.channel_names},'pr_file_loc',[],'rp',rp);
-for channel_num=1:size(out_unmix.x,1)
-    % determine standarding range for Raman map
-%     [im1_out, im2_out]=registerImagesByShiftingGrayScale(rp.tissue_map,squeeze(out_unmix.x(1,:,:)),rp.reg_param);
-%     [reg_mask_out, im2_out]=registerImagesByShifting2(rp.tissue_map,squeeze(out_unmix.x(1,:,:)),rp.reg_param);
-    [im2_out, reg_mask_out]=registerImagesByShifting2(squeeze(out_unmix.x(1,:,:)),rp.tissue_map,rp.reg_param);
+out=struct('fused',im_reg_blank,'im1_reg_rgb',im_reg_blank,'im2_reg_rgb',im_reg_blank,'im2_reg_grayscale',im_reg_blank_grayscale,'im1',im1,'im2_fit',struct('x',im2_fit.x,'wavenumber_b_est',im2_fit.wavenumber_b_est),'scale',zeros(size(im2_fit.x,1),2),'colormap',colormap_use,'ratio_colormaps',colormap_ratios,'reg_param',rp.reg_param,'A',rp.A,'x',im2_fit.x,'channel_names',{rp.channel_names},'pr_file_loc',[],'rp',rp);
+
+% register channels one by one
+for channel_num=1:size(im2_fit.x,1)
+    [im2_out, reg_mask_out]=registerImagesByShifting2(squeeze(im2_fit.x(1,:,:)),rp.tissue_map,rp.reg_param);
     im2_out(im2_out<0)=1e-10;
     masked_im2=im2_out.*reg_mask_out; % apply ROI mask
     if rp.use_dB
         max_raman_intensity=20*log10(max(max(masked_im2)));
         out.scale(channel_num,:)=[max_raman_intensity-60 max_raman_intensity];
-        channel_image=squeeze(out_unmix.x(channel_num,:,:));
+        channel_image=squeeze(im2_fit.x(channel_num,:,:));
         channel_image(channel_image<0)=1e-10;
         raman_grayscale=20*log10(channel_image);
         raman_rgb=intensity2RGB(raman_grayscale,colormap_bg,out.scale(channel_num,:));
     else
         max_raman_intensity=max(max(masked_im2));
         out.scale(channel_num,:)=[max_raman_intensity*0.05 max_raman_intensity*0.95];
-        raman_grayscale=squeeze(out_unmix.x(channel_num,:,:));
+        raman_grayscale=squeeze(im2_fit.x(channel_num,:,:));
         raman_rgb=intensity2RGB(raman_grayscale,colormap_bg,out.scale(channel_num,:));
     end
 
@@ -262,15 +272,25 @@ end
 % generate file name for saving and save
 slash_loc=strfind(rp.im2_path,mkslash);
 dot_loc=strfind(rp.im2_filename,'.');
-filename_save=rp.im2_filename(1:dot_loc(end)-1);
-if invar.input_rp_file_location
-    save_file_path=dir_in;
+
+if strfind(rp.im2_filename(1:dot_loc(end)-1),'_to_')
+    underscore_loc_filename=strfind(rp.im2_filename,'_');
+    filename_save = rp.im2_filename(1:underscore_loc_filename(1)-1);
 else
-    save_file_path=strcat(rp.im2_path,filename_save,'.pr.mat');
+    filename_save=rp.im2_filename(1:dot_loc(end)-1);
 end
-out.pr_file_loc=save_file_path;
+
+if (invar.data_input_mode == 1)
+    processed_path=dir_in;
+else
+    processed_mat_path=strcat(rp.im2_path,filename_save,'.pr.mat');
+    raw_mat_path=strcat(rp.im2_path,filename_save,'-raw.pr.mat');
+end
+out.processed_mat_file_loc=processed_mat_path;
+out.raw_mat_file_loc=raw_mat_path;
 prdata=out; %#ok<NASGU>
-save(out.pr_file_loc,'prdata','-v7.3');
+save(out.processed_mat_file_loc,'prdata');
+prdata.im2_raw=im2;
 
 % display(strcat('processed data written to: ',save_file_path))
 end

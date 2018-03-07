@@ -22,7 +22,7 @@ function varargout = visualizeRaman(varargin)
 
 % Edit the above text to modify the response to help visualizeRaman
 
-% Last Modified by GUIDE v2.5 19-Jun-2017 11:28:22
+% Last Modified by GUIDE v2.5 28-Feb-2018 17:55:45
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -63,14 +63,16 @@ setupGui(handles);
 
 function setupGui(handles,varargin)
 
-invar = struct('pr_file_location',[],'first_call',1);
+invar = struct('prdata_source',0,'pr_file_location',[],'first_call',1,'prdata',[]);
 argin = varargin;
 invar = generateArgin(invar,argin);
 
-if isempty(invar.pr_file_location) %user interface to find file location
+if invar.prdata_source==0
+%     error('when prdata_source = 0, ');
+        
     [pr_file,path]=uigetfile(strcat(pwd,mkslash,'*.pr.mat'),'Select '',pr.mat'' file');
     
-    % load prdata
+    % load processed Raman data (prdata)
     warning('off','MATLAB:load:variableNotFound');
     load(strcat(path,pr_file),'out','prdata');
     warning('on','MATLAB:load:variableNotFound');
@@ -81,7 +83,15 @@ if isempty(invar.pr_file_location) %user interface to find file location
     prdata.file_path=path;
     prdata.file_name=pr_file;
     prdata.pr_file_loc=strcat(path,pr_file);
-else %location of file is passed
+    
+    % now load raw Raman data
+    [im2,~]=loadRawRamanFromHD(prdata.rp);
+    prdata.im2_raw=im2;
+    clear im2
+elseif invar.prdata_source == 1 %location of file is passed !!!may be broken now
+    if ~exist(invar.pr_file_location,'dir')
+        error('when prdata_source = 1, must pass a valid .pr.mat file in optional variable "pr_file_location"');
+    end
     slash_locs=strfind(invar.pr_file_location,'\');
     load(invar.pr_file_location);
     if ~exist('prdata','var')
@@ -91,6 +101,11 @@ else %location of file is passed
     prdata.file_name=invar.pr_file_location(slash_locs(end)+1:end);
     prdata.pr_file_loc=strcat(prdata.file_path,prdata.file_name);
     clear out
+elseif invar.prdata_source == 2 % all raw and processed data passed through function input
+    if isempty(invar.prdata)
+        error('when prdata_source = 2, must pass in the prdata structure via the optional input variable "prdata"');
+    end
+    prdata = invar.prdata;
 end
 
 % set visualizeRaman properties
@@ -129,7 +144,7 @@ setappdata(gcf,'prdata',prdata);
 % end
 if invar.first_call
     set(handles.popupmenu1,'string',prdata.channel_names);
-    set(handles.popupmenu2,'string',prdata.channel_names);
+    set(handles.popupmenu2,'string',[prdata.channel_names {'sum'}]);
     if prdata.rp.num_np_channels==1
         set(handles.popupmenu1,'value',1);
     else
@@ -161,6 +176,7 @@ updateImages(handles);
 prdata=getappdata(gcf,'prdata');
 menu_names=prdata.channel_names;
 menu_names{end+1}='Current Ratio';
+menu_names{end+1}='SERS Sum';
 set(handles.popupmenu4,'String',menu_names);
 
 % save gui figure handle
@@ -208,7 +224,7 @@ plotDecomp(f_gui,handles,'update_ratio_image',0);
 
 
 function plotDecomp(f_gui,handles,varargin)
-invar = struct('update_ratio_image',1,'f_h','');
+invar = struct('update_ratio_image',1,'f_h','','force_plot',0);
 argin = varargin;
 invar = generateArgin(invar,argin);
 
@@ -226,24 +242,33 @@ if clicked_axis~=-1&&clicked_axis~=4
     
     % if clicked in the axis, but ouside of the range of "b", then don't
     % display anthing.  This usually happens with registered images
-    if ~(im2_loc_rc(1)<1 || im2_loc_rc(1)>size(prdata.im2.b,1) || im2_loc_rc(2)<1 || im2_loc_rc(2)>size(prdata.im2.b,2))
+    if ~(im2_loc_rc(1)<1 || im2_loc_rc(1)>size(prdata.im2_raw.spectra,1) || im2_loc_rc(2)<1 || im2_loc_rc(2)>size(prdata.im2_raw.spectra,2)) || invar.force_plot
         if ~isempty(invar.f_h)
             figure(invar.f_h)
         end
         hold off
-        plot(prdata.im2.wavenumber_b,squeeze(prdata.im2.b(im2_loc_rc(1),im2_loc_rc(2),:)))
-        hold on
-        for channel_num=1:size(prdata.x,1)
-           plot(prdata.im2.wavenumber_b_est,prdata.A(channel_num,:)*prdata.x(channel_num,im2_loc_rc(1),im2_loc_rc(2)));
+        
+        if get(handles.checkbox4,'Value')
+            % interpolate onto same x axis
+            acq_spectrum_interp=interp1(prdata.im2_raw.wavenumber,squeeze(prdata.im2_raw.spectra(im2_loc_rc(1),im2_loc_rc(2),:)),prdata.im2_fit.wavenumber_b_est);
+            lsq_fit=(prdata.A'*prdata.x(:,im2_loc_rc(1),im2_loc_rc(2))).';
+            plot(prdata.im2_fit.wavenumber_b_est,acq_spectrum_interp-lsq_fit);
+        else
+            plot(prdata.im2_raw.wavenumber,squeeze(prdata.im2_raw.spectra(im2_loc_rc(1),im2_loc_rc(2),:)),'linewidth',2)
+            hold on
+            for channel_num=1:size(prdata.x,1)
+               plot(prdata.im2_fit.wavenumber_b_est,prdata.A(channel_num,:)*prdata.im2_fit.x(channel_num,im2_loc_rc(1),im2_loc_rc(2)));
+            end
+            if get(handles.checkbox3,'value')
+                plot(prdata.im2_fit.wavenumber_b_est,prdata.A'*prdata.im2_fit.x(:,im2_loc_rc(1),im2_loc_rc(2)),'r','linewidth',2);
+            end
         end
-        if get(handles.checkbox3,'value')
-            plot(prdata.im2.wavenumber_b_est,prdata.A'*prdata.x(:,im2_loc_rc(1),im2_loc_rc(2)),'r','linewidth',2);
-        end
-        xlim([min(prdata.im2.wavenumber_b) max(prdata.im2.wavenumber_b)]);
+        
+        xlim([min(prdata.im2_fit.wavenumber_b_est) max(prdata.im2_fit.wavenumber_b_est)]);
         xlabel('Raman Shift (cm^-^1)');
         ylabel({'Raman scattering intensity','(counts/mW/s)'});
         title({'Raman scattering intensity in',strcat('pixel (',num2str(im2_loc_rc(1)),',',num2str(im2_loc_rc(2)),')')});
-
+        
         prdata.im2_loc_rc=im2_loc_rc;
         prdata.click_location_rc=click_location_rc;
         setappdata(f_gui,'prdata',prdata);
@@ -321,6 +346,11 @@ figure(f_gui);
 prdata=getappdata(f_gui,'prdata');
 image1_channel=get(handles.popupmenu1,'value');
 image2_channel=get(handles.popupmenu2,'value');
+
+if get(handles.popupmenu2,'value')==size(prdata.x,1)+1 %then we are doing sum normalization
+    image2_channel=1:prdata.rp.num_np_channels;
+end
+
 image1_concentration=prdata.rp.concentrations(image1_channel);
 image2_concentration=prdata.rp.concentrations(image2_channel);
 
@@ -339,13 +369,25 @@ end
 
 % convert images back to linear scale
 if prdata.rp.use_dB ~= 0
-    image1=10.^(image1/image1_concentration/20);
-    image2=10.^(image2/image2_concentration/20);
+    image1=10.^(image1/20);
+    image2=10.^(image2/20);
+end
+
+% concentration correction
+if size(image2_channel,2)>1
+    for channel_num=1:size(image2_channel,2)
+        image2(channel_num,:,:)=image2(channel_num,:,:)/image2_concentration(channel_num);
+    end
+    image2=squeeze(sum(image2,1));
 else
-    image1=image1/image1_concentration;
     image2=image2/image2_concentration;
 end
+
+image1=image1/image1_concentration;
+
+
 % take ratio of the two images
+
 if get(handles.popupmenu5,'Value')==1
     combined_image=image1./image2;
 elseif get(handles.popupmenu5,'Value')==2
@@ -378,6 +420,7 @@ end
 
 ratio_rgb=intensity2RGB(combined_image,invar.colormap,ratio_range);
 
+% if we are thresholding
 if get(handles.checkbox1,'Value')
     raw=log10imInv(prdata.im2_reg_grayscale);
     threshold=str2num(get(handles.edit1,'String'));
@@ -385,6 +428,13 @@ if get(handles.checkbox1,'Value')
     prdata.thresh_mask=thresh_mask;
     for rgb_num=1:3
         ratio_rgb(:,:,rgb_num)=squeeze(ratio_rgb(:,:,rgb_num)).*thresh_mask;
+    end
+end
+
+% if there is a mask
+if isfield(prdata,'current_mask')
+    for rgb_num=1:3
+        ratio_rgb(:,:,rgb_num)=squeeze(ratio_rgb(:,:,rgb_num)).*prdata.current_mask;
     end
 end
 
@@ -493,7 +543,8 @@ updateRatioImage(gcf,handles);
 prdata=getappdata(gcf,'prdata');
 prdata.vrprops.checkbox1_value=get(hObject,'Value');
 setappdata(gcf,'prdata',prdata);
-save(prdata.pr_file_loc,'prdata');
+% prdata=rmfield(prdata,'im2_raw');
+% save(prdata.pr_file_loc,'prdata');
 
 
 function edit1_Callback(hObject, eventdata, handles)
@@ -530,7 +581,8 @@ end
 prdata=getappdata(cf,'prdata');
 prdata.vrprops.edit1_string=get(hObject,'String');
 setappdata(cf,'prdata',prdata);
-save(prdata.pr_file_loc,'prdata');
+% prdata=rmfield(prdata,'im2_raw');
+% save(prdata.pr_file_loc,'prdata');
 if t>0.2
     close(f_h);
 end
@@ -565,7 +617,8 @@ updateRatioImage(gcf,handles);
 prdata=getappdata(gcf,'prdata');
 prdata.vrprops.popupmenu4_value=get(hObject,'Value');
 setappdata(gcf,'prdata',prdata);
-save(prdata.pr_file_loc,'prdata');
+% prdata=rmfield(prdata,'im2_raw');
+% save(prdata.pr_file_loc,'prdata');
 
 
 % --- Executes during object creation, after setting all properties.
@@ -592,8 +645,10 @@ if threshold_option>=0 && threshold_option<=size(prdata.channel_names,2)
     else
         raw=squeeze(prdata.im2_reg_grayscale(threshold_option,:,:));
     end
-else
+elseif threshold_option == size(prdata.channel_names,2)+1
     raw=prdata.combined_image;
+elseif threshold_option == size(prdata.channel_names,2)+2
+    raw=squeeze(sum(prdata.im2_reg_grayscale(1:prdata.rp.num_np_channels,:,:)));
 end
 
 thresh_mask=raw>=threshold;
@@ -692,17 +747,14 @@ num_plots=prdata.rp.num_np_channels + show_photo;
 %ratio image:
 ri = updateRatioImage(f_gui,handles);
 
-num_row=ceil(sqrt(num_plots));
-% num_row=1;
-% num_col=num_plots;
-num_col=ceil(num_plots/num_row);
+% one row:
+num_row=1;
+num_col=num_plots;
+
+% rectangle
+% num_row=ceil(sqrt(num_plots));
+% num_col=ceil(num_plots/num_row);
 f_popup=figure;
-% subplot(num_row,num_col,1);
-% colormap(prdata.colormap)
-% imagesc(ax1_img,[0 1]);
-% colorbar
-% axis image off
-% title('photograph','FontSize',fs);
 
 % show photo
 if show_photo
@@ -710,78 +762,55 @@ if show_photo
     imagesc(prdata.im1);
     axis image off
     title('photograph')
-    colorbar
+%     colorbar
 end
 
 % set channel names
-prdata.channel_names{1}='s420-CA9';
-prdata.channel_names{2}='s421-hIgG4';
-prdata.channel_names{3}='s440-CD47';
+% prdata.channel_names{1}='s420-CA9';
+% prdata.channel_names{2}='s421-hIgG4';
+% prdata.channel_names{3}='s440-CD47';
 
-% for channel_num=1:prdata.rp.num_np_channels
-%     subplot(num_row,num_col,channel_num+show_photo);
-%     
-%     % show each channel without blending
-%     %ax2_img=squeeze(prdata.im2_reg_rgb(channel_num,:,:,:));
-%     
-%     % show fused images
-%     ax2_img=squeeze(prdata.im2_reg_rgb(channel_num,:,:,:));
-% 
-%     % threshold options
-%     thresh_mask=determineThresholdMask(f_gui,handles);
-% %     thresh_mask=ones(size(squeeze(ax2_img(:,:,1))));
-%     
-%     for rgb_num=1:3
-%         ax2_img(:,:,rgb_num)=squeeze(ax2_img(:,:,rgb_num)).*thresh_mask;
-%     end
-%     
-%     % optional fuse
-%     ax3_img=imfuse(ax1_img,ax2_img,'blend');
-%     ax3_img(img_nan)=255;
-%     %ax3_img = ax2_img;
-%     
-%     % display
-%     % squeeze(prdata.im2.x(channel_num,:,:)).*thresh_mask
-%     % c_range=[str2double(get(handles.edit2,'string')) str2double(get(handles.edit3,'string'))];
+for channel_num=1:prdata.rp.num_np_channels
+    subplot(num_row,num_col,channel_num+show_photo);
+    
+    % show each channel without blending
+    %ax2_img=squeeze(prdata.im2_reg_rgb(channel_num,:,:,:));
+    
+    % show fused images
+    ax2_img=squeeze(prdata.im2_reg_rgb(channel_num,:,:,:));
+
+    % threshold options
+    thresh_mask=determineThresholdMask(f_gui,handles);
+%     thresh_mask=ones(size(squeeze(ax2_img(:,:,1))));
+    
+    for rgb_num=1:3
+        ax2_img(:,:,rgb_num)=squeeze(ax2_img(:,:,rgb_num)).*thresh_mask;
+    end
+    
+    % optional fuse
+    ax3_img=imfuse(ax1_img,ax2_img,'blend');
+    ax3_img(img_nan)=255;
+    %ax3_img = ax2_img;
+    
+    % display
+    % squeeze(prdata.im2.x(channel_num,:,:)).*thresh_mask
+    c_range=[str2double(get(handles.edit2,'string')) str2double(get(handles.edit3,'string'))];
 %     c_range = [0 1];
-%     imagesc(ax3_img,c_range); %% this scale might not be appropriate!!! fix later
-%     axis image off
+    imagesc(ax3_img,c_range); %% this scale might not be appropriate!!! fix later
+    axis image off
 %     colormap(prdata.colormap);
 %     colorbar
-%     title(prdata.channel_names{channel_num},'FontSize',fs);
-% end
-
-% make colored image
-channel_names=get(handles.popupmenu1,'string');
-set(handles.popupmenu5,'value',3)
-for channel_num=2:prdata.rp.num_np_channels+1
-    set(handles.popupmenu2,'value',1);
-    set(handles.popupmenu1,'value',channel_num-1);
-    titles=get(handles.popupmenu5,'String');
-    title_=strcat(channel_names{get(handles.popupmenu1,'value')},'/',channel_names{get(handles.popupmenu2,'value')},{' '},titles{get(handles.popupmenu5,'Value')});
-    ri = updateRatioImage(f_gui,handles,'colormap',squeeze(prdata.ratio_colormaps(channel_num-1,:,:)));
-    figure(f_popup);
-    subplot(num_row,num_col,channel_num);
-    fused_image=ri.rgb;
-    fused_image(img_nan)=255;
-    imagesc(fused_image,ri.scale);
-    colorbar
-    axis image off
-    title(title_{1},'FontSize',fs);
-    
-    %show colorbar
-    figure
-    colormap(squeeze(prdata.ratio_colormaps(channel_num-1,:,:)));
-    imagesc(fused_image,ri.scale);
-    colorbar
-    axis image off
-    title(title_,'FontSize',fs);
-    niceFigure(gcf);
+    title(prdata.channel_names{channel_num},'FontSize',fs);
 end
 
 niceFigure(f_popup);
 figure(f_gui);
 updateRatioImage(gcf,handles);
+
+figure,imagesc(ones(64));
+colormap(prdata.colormap);
+colorbar
+
 % imagesc(ri.rgb,ri.scale);
 
 
@@ -888,7 +917,7 @@ if get(handles.checkbox1,'Value')
     % wait until user gives a valid click
     k=1;
     axis5_click=0;
-    while k~=0 || axis5_click==0;
+    while k~=0 || axis5_click==0
         k = waitforbuttonpress;
         click_location5=get(handles.axes5,'CurrentPoint');
         axis5_click=(click_location5(1,2)>=1)&&(click_location5(1,2)<=size(prdata.im1_reg_rgb,2))&&(click_location5(1,1)>=1)&&(click_location5(1,1)<=size(prdata.im1_reg_rgb,3));
@@ -1021,7 +1050,7 @@ function pushbutton12_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 prdata=getappdata(gcf,'prdata');
-setupGui(handles,'pr_file_location',processRaman(prdata.pr_file_loc,'input_rp_file_location',1,'redo',5),'first_call',0);
+setupGui(handles,'prdata',processRaman(prdata.pr_file_loc,'data_input_mode',2,'redo',5,'input_data',prdata),'first_call',0,'prdata_source',2);
 updateRatioImage(gcf,handles);
 
 
@@ -1032,7 +1061,7 @@ function pushbutton13_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 prdata=getappdata(gcf,'prdata');
-setupGui(handles,'pr_file_location',processRaman(prdata.pr_file_loc,'input_rp_file_location',1,'redo',6),'first_call',1);
+setupGui(handles,'prdata',processRaman(prdata.pr_file_loc,'data_input_mode',2,'redo',6,'input_data',prdata),'first_call',0,'prdata_source',2);
 prdata=getappdata(gcf,'prdata');
 
 % --- Executes on button press in pushbutton14.
@@ -1041,9 +1070,19 @@ function pushbutton14_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 prdata=getappdata(gcf,'prdata');
-setupGui(handles,'pr_file_location',processRaman(prdata.pr_file_loc,'input_rp_file_location',1,'redo',7),'first_call',0);
+click_location_xy=prdata.click_location_xy;
+setupGui(handles,'prdata',processRaman(prdata.pr_file_loc,'data_input_mode',2,'redo',7,'input_data',prdata),'first_call',0,'prdata_source',2);
 updateRatioImage(gcf,handles);
+
+% reset the old click position
+prdata=getappdata(gcf,'prdata');
+prdata.click_location_xy=click_location_xy;
+setappdata(gcf,'prdata',prdata);
 plotDecomp(gcf,handles);
+
+% update pulldown menues
+set(handles.popupmenu1,'string',prdata.channel_names);
+set(handles.popupmenu2,'string',[prdata.channel_names {'sum'}]);
 
 
 % --- Executes on button press in checkbox3.
@@ -1083,3 +1122,37 @@ setappdata(gcf,'prdata',prdata);
 updateRatioImage(gcf,handles);
 plotContour(handles);
 updateTable(handles);
+
+
+% --- Executes on button press in checkbox4.
+function checkbox4_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox4 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox4
+plotDecomp(gcf,handles,'update_ratio_image',0);
+
+
+% --- Executes on button press in pushbutton16.
+function pushbutton16_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton16 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if strcmp(get(hObject,'String'),'Draw Mask')
+    prdata=getappdata(gcf,'prdata');
+    axes(handles.axes5);
+    prdata.current_mask = roipoly;
+    setappdata(gcf,'prdata',prdata);
+    updateRatioImage(gcf,handles);
+    set(hObject,'String','Del. Mask');
+elseif strcmp(get(hObject,'String'),'Del. Mask')
+    prdata=getappdata(gcf,'prdata');
+    if isfield(prdata,'current_mask')
+        prdata=rmfield(prdata,'current_mask');
+    end
+    setappdata(gcf,'prdata',prdata);
+    updateRatioImage(gcf,handles);
+    set(hObject,'String','Draw Mask');
+end

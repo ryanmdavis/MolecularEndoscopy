@@ -24,13 +24,16 @@ if strfind(text1{1}','Streamline')
     temp=textscan(fid,'%c',10);
     inter_spectra_buffer_size=8;
     after_spectra_buffer_size=14;
+    mode = 'Streamline';
 elseif strfind(text1{1}','spectral')
     inter_spectra_buffer_size=9;
     after_spectra_buffer_size=16;
+    mode = 'Spectrum';
 elseif strfind(text1{1}','mappingmeasurement')
     temp=textscan(fid,'%c',8); %12
     inter_spectra_buffer_size=8;
     after_spectra_buffer_size=14;
+    mode = 'Map';
 else
     error('Exeperiment type not recognized');
 end
@@ -82,7 +85,7 @@ exp_sec=str2num(text2(exp_loc:exp_loc_end));
 normalization_divisor=power_mW*acc_num*exp_sec;
 if isempty(normalization_divisor) normalization_divisor=1; end
 normalized_spectra=spectra/normalization_divisor;
-out=struct('wavenumber',wavenumbers,'spectra',normalized_spectra,'normalization_divisor',normalization_divisor,'normalization_divisor_unit','mW*(# accs)');
+out=struct('wavenumber',wavenumbers,'spectra',normalized_spectra,'normalization_divisor',normalization_divisor,'normalization_divisor_unit','mW*(# accs)','mode',mode);
 
 % close file
 fclose(fid);

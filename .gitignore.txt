@@ -1,0 +1,5 @@
+testignore.txt
+.dropbox
+/sample dataset/*
+/standards and background spectra/quartz background/*
+/standards and background spectra/tissue background/*

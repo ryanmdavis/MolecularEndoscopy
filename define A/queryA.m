@@ -213,7 +213,7 @@ elseif (nargin ==4 && ~isempty(varargin{1})) %use previously defined values
     set(handles.popupmenu1,'value',A_info.mode);
     
     % set custom spectra choices
-    for choice = 1:size(choices,2)
+    for choice = 1:size(A_info.custom_spectra_choices,2)
         set(handles.(strcat('popupmenu',num2str(choice+2))),'Value',A_info.custom_spectra_choices(choice));
     end
 else

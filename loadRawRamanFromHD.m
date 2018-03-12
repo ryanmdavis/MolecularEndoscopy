@@ -36,6 +36,6 @@ function im2 = queryAndReshape(im2,rp)
         end
         im2.spectra = permute(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,size(im2.spectra,2)),[2,1,3]);
     else %if we've already loaded this dataset before, the image size is stored under rp.tissue_map
-        im2.spectra = permute(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,size(im2.spectra,2)),[2,1,3]);
+        im2.spectra = permute(reshape(im2.spectra,size(rp.tissue_map,1),size(rp.tissue_map,2),size(im2.spectra,2)),[2,1,3]);
     end
 end

@@ -4,7 +4,7 @@
     ambiguous={}; %#ok<NASGU>
     urothelium={'E1S2','E3S1','E4S2','E5S1','E6S1','E10S1','E8S5'};
     tumor={'E2S1','E2S2','E5S2','E8S3','E8S4','E9S1','E9S2','E9S3'};
-    muscle={'E1S1','E1S3','E4S1','E6S2','E6S3','E8S1','E8S2'};
+    muscle={'E1S1','E1S3','E4S1','E6S2','E6S3','E8S1','E8S2','E10S2'};
 
     switch channel
         case 's440'

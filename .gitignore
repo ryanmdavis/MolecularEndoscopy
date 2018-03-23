@@ -1,5 +1,5 @@
 testignore.txt
 .dropbox
-/sample dataset/*
-/standards and background spectra/quartz background/*
-/standards and background spectra/tissue background/*
+/sample_dataset/*
+/standards_and_background_spectra/quartz_background/*
+/standards_and_background_spectra/tissue_background/*

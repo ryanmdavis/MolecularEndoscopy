@@ -85,6 +85,7 @@ if invar.prdata_source==0
     prdata.pr_file_loc=strcat(path,pr_file);
     
     % now load raw Raman data
+    prdata.rp = fixChangedPath(prdata.rp, pr_file, path);
     [im2,~]=loadRawRamanFromHD(prdata.rp);
     prdata.im2_raw=im2;
     clear im2

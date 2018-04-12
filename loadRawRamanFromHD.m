@@ -25,6 +25,7 @@ end
 
 
 function [im2,rp] = queryAndReshape(im2,rp)
+
     % get info about image matrix size
     if isempty(rp.tissue_map)
         if isempty(rp.im2_nrow) %|| invar.redo==4 || invar.redo==-1
@@ -34,22 +35,13 @@ function [im2,rp] = queryAndReshape(im2,rp)
         if isempty(rp.im2_ncol) %|| invar.redo==4 || invar.redo==-1
             rp.im2_ncol=input('Enter the number of cols in the Raman map: ');
         end
-%         if strcmp(im2.mode,'Streamline') % Streamline mode scans in y direction
-%             im2.spectra = fliplr(reshape(im2.spectra,rp.im2_nrow,rp.im2_ncol,size(im2.spectra,2)));
-%         else if strcmp(im2.mode,'Map')
-%             im2.spectra = flipud(imrotate(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,1011),-90));
-%         end
-%     else %if we've already loaded this dataset before, the image size is stored under rp.tissue_map
-%         if strcmp(im2.mode,'Streamline') % Streamline mode scans in y direction
-%             im2.spectra = fliplr(reshape(im2.spectra,rp.im2_nrow,rp.im2_ncol,size(im2.spectra,2)));
-%         elseif strcmp(im2.mode,'Map')
-%             im2.spectra = flipud(imrotate(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,1011),-90));
-%         end
     end
     
-    if strcmp(im2.mode,'Streamline') % Streamline mode scans in y direction
+    if isfield(rp,'mode') && strcmp(im2.mode,'Streamline') % Streamline mode scans in y direction
         im2.spectra = fliplr(reshape(im2.spectra,rp.im2_nrow,rp.im2_ncol,size(im2.spectra,2)));
-    elseif strcmp(im2.mode,'Map') % Simple mapping measurements scan in x direction
-        im2.spectra = flipud(imrotate(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,1011),-90));
+    elseif isfield(rp,'mode') && strcmp(im2.mode,'Map') % Simple mapping measurements scan in x direction
+        im2.spectra = flipud(imrotate(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,[]),-90));
+    elseif ~isfield(rp,'mode') %if is endoscope data
+        im2.spectra = permute(reshape(im2.spectra,rp.im2_ncol,rp.im2_nrow,[]),[2 1 3]);
     end    
 end

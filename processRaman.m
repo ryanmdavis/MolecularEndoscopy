@@ -74,34 +74,6 @@ if ~exist(rp.im2_path,'dir') && ~isempty(rp.im2_path)
     end
 end
 
-
-% % if the reconstruction parameters for this dataset already exist, load
-% % them, if not then define the structure.
-% if ~exist(strcat(parent_dir,'reconstruction parameters.mat'),'file') || invar.redo==-1
-%     rp=struct('im1_path','','im2_path','','reg_param',[],'im1',[],'im2',[],'im2_nrow',[],'im2_ncol',[],'fused',[],'tissue_map',[],'A',[],'wavenumber',[],'channel_names',[]);
-% else
-%     rp = loadRp(parent_dir);
-% end
-
-% find location of Raman image and store in memory:
-% if isempty(rp.im2_path) || invar.redo==3 || invar.redo==-1
-%     [filename,pathname] = uigetfile({'*.txt','Endoscope data';'*.*','All Files';
-%             '*.spc','Microscope data';},'Locate the .txt file with Raman Data',parent_dir);
-%     % make sure parent dir has slash at end
-%     if ~strcmp(pathname(end),mkslash) pathname = strcat(pathname,mkslash); end
-%     rp.im2_path=pathname;
-%     rp.im2_filename=filename;
-%     dot_loc=strfind(rp.im2_filename,'.');
-%     filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
-%     
-%     % save recon parameters
-%     saveRp(filename_save,rp);
-% else
-%     % define path to save the processed Raman data (.pr.mat)
-%     dot_loc=strfind(rp.im2_filename,'.');
-%     filename_save=strcat(rp.im2_path,rp.im2_filename(1:dot_loc(end)-1));
-% end
-
 %% load photograph if desired
 if isempty(rp.im1_path) || invar.redo==1 || invar.redo==-1 || (invar.redo == 6 && strcmp(rp.im1_path,'none'))
     [filename,pathname] = uigetfile({'*.jpg;*.tif;*.png;*.gif','All Image Files';...

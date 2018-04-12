@@ -85,7 +85,7 @@ exp_sec=str2num(text2(exp_loc:exp_loc_end));
 normalization_divisor=power_mW*acc_num*exp_sec;
 if isempty(normalization_divisor) normalization_divisor=1; end
 normalized_spectra=spectra/normalization_divisor;
-out=struct('wavenumber',wavenumbers,'spectra',normalized_spectra,'normalization_divisor',normalization_divisor,'normalization_divisor_unit','mW*(# accs)','mode',mode);
+out=struct('wavenumber',wavenumbers,'spectra',normalized_spectra,'normalization_divisor',normalization_divisor,'normalization_divisor_unit','mW*(# accs)','mode',mode,'exposure_seconds',exp_sec);
 
 % close file
 fclose(fid);

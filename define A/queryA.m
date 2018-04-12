@@ -175,8 +175,8 @@ if nargin==3 || (nargin ==4 && isempty(varargin{1})) %defaults
     set(handles.checkbox7,'value',1);
     set(handles.checkbox17,'value',1);
     set(handles.edit1,'string','11');
-%     set(handles.edit2,'string','1100');
-%     set(handles.edit3,'string','1700');
+    set(handles.edit2,'string','1100');
+    set(handles.edit3,'string','1700');
     set(handles.popupmenu2,'value',5);
     
     % set conditional defaults
@@ -188,7 +188,7 @@ if nargin==3 || (nargin ==4 && isempty(varargin{1})) %defaults
     
     
     set(handles.edit4,'string','0');
-    setDefaultFitRange(handles)
+    %setDefaultFitRange(handles)
 elseif (nargin ==4 && ~isempty(varargin{1})) %use previously defined values
     A_info=varargin{1};
     prdata.num_np_channels=A_info.num_np_channels;
@@ -877,15 +877,23 @@ end
 
 function setDefaultFitRange(handles)
 
-prdata=getappdata(gcf,'prdata');
+%prdata=getappdata(gcf,'prdata');
+% if get(handles.popupmenu1,'value')==1 %endoscope
+%     set(handles.edit2,'string',num2str(prdata.endoscope_wavenumber(1)));
+%     set(handles.edit3,'string',num2str(prdata.endoscope_wavenumber(end)));
+% elseif get(handles.popupmenu1,'value')==2 %microscope
+%     set(handles.edit2,'string',num2str(prdata.microscope_wavenumber(1)));
+%     set(handles.edit3,'string',num2str(prdata.microscope_wavenumber(end)));
+% end
 
 if get(handles.popupmenu1,'value')==1 %endoscope
-    set(handles.edit2,'string',num2str(prdata.endoscope_wavenumber(1)));
-    set(handles.edit3,'string',num2str(prdata.endoscope_wavenumber(end)));
+    set(handles.edit2,'string','1100');
+    set(handles.edit3,'string','1700');
 elseif get(handles.popupmenu1,'value')==2 %microscope
-    set(handles.edit2,'string',num2str(prdata.microscope_wavenumber(1)));
-    set(handles.edit3,'string',num2str(prdata.microscope_wavenumber(end)));
+    set(handles.edit2,'string','900');
+    set(handles.edit3,'string','1700');
 end
+
 
 
 % --- Executes on button press in checkbox17.

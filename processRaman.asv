@@ -53,19 +53,14 @@ else
     % test what kind of dataset this is (microscope or endoscope)
     d=dir(parent_dir);
     file_num=1;
-    while file_num<=size(d,1) && isempty(strfind(d(file_num).name,'.spc'))
+    while isempty(strfind(d(file_num).name,'.spc')) && file_num<=size(d,1)
+      
         file_num=file_num+1;
     end
     
-    if file_num>size(d,1)
-        file_options={'*.txt','Endoscope data';'*.*','All Files';'*.spc','Microscope data';};
-    else
-        file_options={'*.spc','Microscope data';'*.txt','Endoscope data';'*.*','All Files';};
-    end
-        
-    
     %get location of raw Raman data
-    [filename,pathname] = uigetfile(file_options,'Locate the .txt file with Raman Data',parent_dir);
+    [filename,pathname] = uigetfile({'*.txt','Endoscope data';'*.*','All Files';
+            '*.spc','Microscope data';},'Locate the .txt file with Raman Data',parent_dir);
     % make sure parent dir has slash at end
     if ~strcmp(pathname(end),mkslash) pathname = strcat(pathname,mkslash); end
     rp.im2_path=pathname;
